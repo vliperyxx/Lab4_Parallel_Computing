@@ -33,4 +33,32 @@ public:
         }
         return true;
     }
+
+    bool startListening() {
+        if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
+            std::cout << "Listening socket failed: " << WSAGetLastError() << std::endl;
+            closesocket(serverSocket);
+            WSACleanup();
+            return false;
+        }
+        std::cout << "Server started listening on port " << port << std::endl;
+
+        closesocket(serverSocket);
+        WSACleanup();
+        return true;
+    }
 };
+
+int main() {
+    Server server;
+    if (!server.initializeServer()) {
+        std::cout << "Failed to initialize server." << std::endl;
+        return false;
+    }
+    if (!server.startListening()) {
+        std::cout << "Failed to start listening." << std::endl;
+        return false;
+    }
+
+    return 0;
+}
