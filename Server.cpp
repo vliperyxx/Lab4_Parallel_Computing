@@ -34,6 +34,7 @@ public:
         return true;
     }
 
+
     bool startListening() {
         if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
             std::cout << "Listening socket failed: " << WSAGetLastError() << std::endl;
@@ -42,10 +43,25 @@ public:
             return false;
         }
         std::cout << "Server started listening on port " << port << std::endl;
-
+        while (serverRunning) {
+            sockaddr_in clientAddress;
+            int clientAddressSize = sizeof(clientAddress);
+            SOCKET clientSocket = accept(serverSocket, reinterpret_cast<sockaddr*>(&clientAddress), &clientAddressSize);
+            if (clientSocket == INVALID_SOCKET) {
+                std::cout << "Client accept failed: " << WSAGetLastError() << std::endl;
+                continue;
+            }
+            char* clientIp = inet_ntoa(clientAddress.sin_addr);
+            int clientPort = ntohs(clientAddress.sin_port);
+            std::cout << "New client connected: IP - " << clientIp << ", port - " << clientPort << std::endl;
+        }
         closesocket(serverSocket);
         WSACleanup();
         return true;
+    }
+
+    void stopServer() {
+        serverRunning = false;
     }
 };
 
