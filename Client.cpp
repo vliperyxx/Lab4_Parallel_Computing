@@ -113,6 +113,56 @@ public:
             return;
         }
         std::cout << "Server started processing matrix.\n";
+
+        while (true) {
+            CommandHandler::sendCommand(clientSocket, "STATUS");
+
+            std::string status;
+            int progress = -1;
+            bool statusReceived  = CommandHandler::receiveStatus(clientSocket, status, progress);
+
+            if (!statusReceived ) {
+                std::cout << "Error receiving status.\n";
+                break;
+            }
+
+            if (status == "IN_PROGRESS") {
+                std::cout << "Processing: " << progress << "% complete.\n";
+            }
+            else if (status == "DONE") {
+                std::cout << "Processing done by server.\n";
+                break;
+            }
+            else {
+                std::cout << "Unknown status received: " << status << "\n";
+                break;
+            }
+
+            Sleep(100);
+        }
+
+        CommandHandler::sendCommand(clientSocket, "RESULT");
+        std::vector<int> resultMatrix;
+
+        bool resultReceived = CommandHandler::receiveMatrixChunked(clientSocket, resultMatrix);
+        if (!resultReceived || resultMatrix.empty()) {
+            std::cout << "Error receiving matrix result.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+
+        std::cout << "Processed matrix received from server.\n";
+
+        CommandHandler::sendCommand(clientSocket, "END");
+        closesocket(clientSocket);
+        WSACleanup();
+
+        if (matrixSize <= 10) {
+            std::cout << "\nProcessed Matrix:\n";
+            MatrixOperations::printMatrix(resultMatrix.data(), matrixSize);
+        }
+
+        MatrixOperations::freeMatrix(matrix);
     }
 };
 

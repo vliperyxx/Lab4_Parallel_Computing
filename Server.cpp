@@ -97,6 +97,28 @@ public:
                     std::cout << "Computation started." << std::endl;
                 }
             }
+            else if (command == "STATUS") {
+                int progress = (columnsProcessed * 100) / matrixSize;
+                if (processing && progress < 100) {
+                    CommandHandler::sendStatus(clientSocket, "IN_PROGRESS", progress);
+                }
+                else {
+                    CommandHandler::sendStatus(clientSocket, "DONE");
+                }
+            }
+            else if (command == "RESULT") {
+                if (!processing) {
+                    CommandHandler::sendMatrixChunked(clientSocket, matrix, 4096);
+                    std::cout << "Processed matrix sent to client." << std::endl;
+                }
+                else {
+                    CommandHandler::sendCommand(clientSocket, "RESULT_ERR");
+                }
+            }
+            else if (command == "END") {
+                isRunning = false;
+                std::cout << "Session ended by client " << inet_ntoa(clientAddress.sin_addr) << ":" << ntohs(clientAddress.sin_port) << "." << std::endl;
+            }
             else {
                 CommandHandler::sendCommand(clientSocket, "UNKNOWN_COMMAND");
             }
