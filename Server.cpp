@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <thread>
 #include <vector>
+#include "MatrixOperations/MatrixOperations.h"
 #include "CommandHandler/CommandHandler.h"
 #pragma comment(lib,"ws2_32.lib")
 
@@ -41,7 +42,10 @@ public:
         std::vector<int> matrix;
         int matrixSize = 0;
         int threadsCount = 0;
+        bool processing = false;
         bool isRunning = true;
+
+        std::atomic<int> columnsProcessed(0);
 
         while (isRunning) {
             std::string command;
@@ -62,6 +66,36 @@ public:
                 }
                 CommandHandler::sendCommand(clientSocket, "SIZE_OK");
                 std::cout << "Matrix size received: " << matrixSize << "x" << matrixSize << std::endl;
+            }
+            else if (command == "DATA") {
+                std::vector<int> receivedMatrix;
+                if (!CommandHandler::receiveMatrixChunked(clientSocket, receivedMatrix)) {
+                    CommandHandler::sendCommand(clientSocket, "DATA_ERR");
+                    std::cout << "Invalid matrix data." << std::endl;
+                }
+                else {
+                    matrix = receivedMatrix;
+                    CommandHandler::sendCommand(clientSocket, "DATA_OK");
+                    std::cout << "Matrix data received." << std::endl;
+                }
+            }
+            else if (command == "START") {
+                if (matrix.empty() || matrixSize <= 0 || threadsCount <= 0) {
+                    CommandHandler::sendCommand(clientSocket, "START_ERR");
+                    std::cout << "Failed to start: check matrix size and number of threads." << std::endl;
+                }
+                else {
+                    processing = true;
+                    columnsProcessed = 0;
+                    CommandHandler::sendCommand(clientSocket, "STARTED");
+
+                    std::thread processingThread([&]() {
+                        MatrixOperations::calculateMaxMultiThread(matrix.data(), matrixSize, threadsCount, &columnsProcessed);
+                        processing = false;
+                    });
+                    processingThread.detach();
+                    std::cout << "Computation started." << std::endl;
+                }
             }
             else {
                 CommandHandler::sendCommand(clientSocket, "UNKNOWN_COMMAND");

@@ -78,6 +78,41 @@ public:
             return;
         }
         std::cout << "Matrix size accepted by server.\n";
+
+        std::vector<int> vec(matrix, matrix + matrixSize * matrixSize);
+        CommandHandler::sendCommand(clientSocket, "DATA");
+
+        if (!CommandHandler::sendMatrixChunked(clientSocket, vec, 4096)) {
+            std::cout << "Error sending matrix data to server.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+
+        std::string dataResponse;
+        CommandHandler::receiveCommand(clientSocket, dataResponse);
+
+        if (dataResponse != "DATA_OK") {
+            std::cout << "Server did not accept matrix data.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+        std::cout << "Matrix data sent successfully.\n";
+
+        if (matrixSize <= 10) {
+            std::cout << "\nInitial Matrix:\n";
+            MatrixOperations::printMatrix(matrix, matrixSize);
+        }
+
+        CommandHandler::sendCommand(clientSocket, "START");
+        std::string startResponse;
+        CommandHandler::receiveCommand(clientSocket, startResponse);
+
+        if (startResponse != "STARTED") {
+            std::cout << "Error starting processing on server.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+        std::cout << "Server started processing matrix.\n";
     }
 };
 
