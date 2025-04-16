@@ -1,4 +1,5 @@
 #include "CommandHandler.h"
+#include <algorithm>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -41,3 +42,79 @@ bool CommandHandler::receiveInt(SOCKET socket, int& value) {
     value = ntohl(networkValue);
     return true;
 }
+
+bool CommandHandler::sendMatrixChunked(SOCKET socket, const std::vector<int>& matrix, int chunkSize) {
+    int totalSize = matrix.size();
+    if (!sendInt(socket, totalSize)) {
+        return false;
+    }
+    std::vector<int> networkMatrix(totalSize);
+    std::transform(matrix.begin(), matrix.end(), networkMatrix.begin(), htonl);
+
+    const char* data = reinterpret_cast<const char*>(networkMatrix.data());
+    int totalBytes = totalSize * sizeof(int);
+    int sentBytes = 0;
+
+    while (sentBytes < totalBytes) {
+        int toSend = std::min(chunkSize, totalBytes - sentBytes);
+        int bytes = send(socket, data + sentBytes, toSend, 0);
+        if (bytes <= 0) {
+            return false;
+        }
+        sentBytes += bytes;
+    }
+
+    return true;
+}
+
+bool CommandHandler::receiveMatrixChunked(SOCKET socket, std::vector<int>& matrix) {
+    int size = 0;
+    if (!receiveInt(socket, size)) {
+        return false;
+    }
+    if (size <= 0 || size > 100000000) {
+        return false;
+    }
+    matrix.resize(size);
+    int totalBytes = size * sizeof(int);
+    char* buffer = reinterpret_cast<char*>(matrix.data());
+    int totalReceived = 0;
+
+    while (totalReceived < totalBytes) {
+        int bytes = recv(socket, buffer + totalReceived, totalBytes - totalReceived, 0);
+        if (bytes <= 0) {
+            return false;
+        }
+        totalReceived += bytes;
+    }
+
+    for (int& value : matrix) {
+        value = ntohl(value);
+    }
+
+    return true;
+}
+
+bool CommandHandler::sendStatus(SOCKET socket, const std::string& status, int progress) {
+    if (!sendCommand(socket, status)) {
+        return false;
+    }
+    if (status == "IN_PROGRESS" && progress >= 0) {
+        return sendInt(socket, progress);
+    }
+    return true;
+}
+
+bool CommandHandler::receiveStatus(SOCKET socket, std::string& status, int& progress) {
+    if (!receiveCommand(socket, status)) {
+        return false;
+    }
+    progress = -1;
+    if (status == "IN_PROGRESS") {
+        if (!receiveInt(socket, progress)) {
+            return false;
+        }
+    }
+    return true;
+}
+
