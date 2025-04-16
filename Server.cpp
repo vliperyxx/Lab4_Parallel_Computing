@@ -1,5 +1,8 @@
 #include <iostream>
 #include <winsock2.h>
+#include <thread>
+#include <vector>
+#include "CommandHandler/CommandHandler.h"
 #pragma comment(lib,"ws2_32.lib")
 
 class Server {
@@ -34,6 +37,39 @@ public:
         return true;
     }
 
+    void handleClient(SOCKET clientSocket, sockaddr_in clientAddress) {
+        std::vector<int> matrix;
+        int matrixSize = 0;
+        int threadsCount = 0;
+        bool isRunning = true;
+
+        while (isRunning) {
+            std::string command;
+            if (!CommandHandler::receiveCommand(clientSocket, command)) {
+                break;
+            }
+
+            if (command == "CONFIG") {
+                if (!CommandHandler::receiveInt(clientSocket, threadsCount)) {
+                    break;
+                }
+                CommandHandler::sendCommand(clientSocket, "CONFIG_OK");
+                std::cout << "Configuration accepted. Threads: " << threadsCount << std::endl;
+            }
+            else if (command == "MATRIX_SIZE") {
+                if (!CommandHandler::receiveInt(clientSocket, matrixSize)) {
+                    break;
+                }
+                CommandHandler::sendCommand(clientSocket, "SIZE_OK");
+                std::cout << "Matrix size received: " << matrixSize << "x" << matrixSize << std::endl;
+            }
+            else {
+                CommandHandler::sendCommand(clientSocket, "UNKNOWN_COMMAND");
+            }
+        }
+
+        closesocket(clientSocket);
+    }
 
     bool startListening() {
         if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
@@ -54,14 +90,12 @@ public:
             char* clientIp = inet_ntoa(clientAddress.sin_addr);
             int clientPort = ntohs(clientAddress.sin_port);
             std::cout << "New client connected: IP - " << clientIp << ", port - " << clientPort << std::endl;
+            std::thread(&Server::handleClient, this, clientSocket, clientAddress).detach();
+
         }
         closesocket(serverSocket);
         WSACleanup();
         return true;
-    }
-
-    void stopServer() {
-        serverRunning = false;
     }
 };
 

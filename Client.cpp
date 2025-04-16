@@ -1,5 +1,7 @@
 #include <iostream>
 #include <winsock2.h>
+#include "MatrixOperations/MatrixOperations.h"
+#include "CommandHandler/CommandHandler.h"
 #pragma comment(lib, "ws2_32.lib")
 
 class Client {
@@ -41,6 +43,42 @@ public:
 
         return true;
     }
+
+    void startClient() {
+        int matrixSize, threadCount;
+        std::cout << "Enter matrix size: ";
+        std::cin >> matrixSize;
+        std::cout << "Enter number of threads: ";
+        std::cin >> threadCount;
+
+        int* matrix = MatrixOperations::allocateMatrix(matrixSize);
+        MatrixOperations::fillMatrix(matrix, matrixSize);
+
+        std::cout << "Connecting to the server...\n";
+
+        CommandHandler::sendCommand(clientSocket, "CONFIG");
+        CommandHandler::sendInt(clientSocket, threadCount);
+        std::string configResponse;
+        CommandHandler::receiveCommand(clientSocket, configResponse);
+        if (configResponse != "CONFIG_OK") {
+            std::cout << "Error in configuration.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+        std::cout << "Server confirmed configuration.\n";
+
+        CommandHandler::sendCommand(clientSocket, "MATRIX_SIZE");
+        CommandHandler::sendInt(clientSocket, matrixSize);
+        std::string sizeResponse;
+        CommandHandler::receiveCommand(clientSocket, sizeResponse);
+
+        if (sizeResponse != "SIZE_OK") {
+            std::cout << "Error sending matrix size to server.\n";
+            MatrixOperations::freeMatrix(matrix);
+            return;
+        }
+        std::cout << "Matrix size accepted by server.\n";
+    }
 };
 
 int main() {
@@ -49,6 +87,7 @@ int main() {
         std::cout << "Failed to initialize client connection.\n";
         return false;
     }
+    client.startClient();
 
     return 0;
 }
